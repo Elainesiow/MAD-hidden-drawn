@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>First Move | Organiser</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#000;color:#F5ECD7;font:16px/1.45 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;padding:20px 16px 60px}
+main{max-width:860px;margin:0 auto}
+h1{font-size:26px;margin:0 0 4px}
+h2{font-size:18px;margin:34px 0 6px;color:#19D3F3}
+p{margin:6px 0;color:rgba(245,236,215,.75)}
+input,textarea,button{font:inherit}
+input,textarea{width:100%;background:#141414;color:#F5ECD7;border:1px solid #444;padding:12px;border-radius:0}
+textarea{min-height:150px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px}
+button{background:#F5ECD7;color:#000;border:0;padding:12px 18px;font-weight:700;cursor:pointer;margin-top:10px}
+button.ghost{background:none;color:#F5ECD7;border:1px solid #666;padding:6px 10px;margin:0 4px 0 0;font-weight:400;font-size:13px}
+button.danger{border-color:#FF2E88;color:#FF2E88}
+#note{position:sticky;top:0;background:#FFD60A;color:#000;padding:10px 12px;font-weight:700;margin:14px 0;display:none;z-index:2}
+#note.err{background:#FF2E88}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.stats div{border:1px solid #444;padding:10px 14px;min-width:120px}
+.stats b{display:block;font-size:26px;color:#FFD60A}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid #2a2a2a;font-size:15px;white-space:nowrap}
+th{color:rgba(245,236,215,.6);font-weight:400;font-size:13px}
+td.res{color:#FFD60A;font-weight:700}
+.yes{color:#19D3F3}.no{color:rgba(245,236,215,.4)}.lock{color:#FF2E88}
+#app{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>MAD VENTURE · First Move · Organiser</h1>
+  <p>Private page. Do not share this link.</p>
+  <div id="note"></div>
+
+  <form id="login">
+    <h2>Admin password</h2>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="Admin password">
+    <button type="submit">Open</button>
+  </form>
+
+  <div id="app">
+    <div class="stats" id="stats"></div>
+    <button id="refresh">Refresh</button>
+    <button id="csv">Download CSV</button>
+
+    <h2>Teams</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Team</th><th>IC set</th><th>Status</th><th>Hidden result</th><th>Seed</th><th>Completed (your local time)</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+
+    <h2>1 · Team Leader IC last 4 digits</h2>
+    <p>One team per line: team number, then the 4 digits. Example: <code>01 1234</code>. You can paste all 24 at once, or only the ones you want to change. The digits are scrambled before saving and cannot be read back, by anyone.</p>
+    <textarea id="codes" placeholder="01 1234&#10;02 5678&#10;03 9012" autocomplete="off" spellcheck="false"></textarea>
+    <button id="saveCodes">Save IC digits</button>
+
+    <h2>2 · Hidden result pool</h2>
+    <p>One line = one slot. Each team that makes its move takes one random unused slot. Example for 4 groups of 6 teams: write <code>A</code> on 6 lines, <code>B</code> on 6 lines, and so on (24 lines). Saving replaces all <b>unused</b> slots; slots already taken by a team stay as they are.</p>
+    <p id="poolNow"></p>
+    <textarea id="pool" placeholder="A&#10;A&#10;B&#10;B" autocomplete="off" spellcheck="false"></textarea>
+    <button id="savePool">Save pool</button>
+    <button id="fill">Give results to teams that are still blank</button>
+  </div>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var pw = '', data = null;
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function note(text, err) { var n = $('note'); n.textContent = text || ''; n.className = err ? 'err' : ''; n.style.display = text ? 'block' : 'none'; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function when(t) { return t ? new Date(t).toLocaleString() : ''; }
+
+  function call(action, extra) {
+    var body = Object.assign({ password: pw, action: action }, extra || {});
+    return fetch('/api/admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { ok: false, error: 'Network error.' }; })
+      .then(function (r) {
+        if (!r.ok) { note(r.error || 'Error', true); return null; }
+        data = r.data; render(); note(r.message || '');
+        return r;
+      });
+  }
+
+  function render() {
+    var teams = data.teams || [], done = 0, coded = 0;
+    $('rows').innerHTML = teams.map(function (t) {
+      if (t.completed_at) done++; if (t.has_code) coded++;
+      return '<tr><td><b>MAD ' + pad(t.team_no) + '</b></td>' +
+        '<td class="' + (t.has_code ? 'yes">Yes' : 'no">Not yet') + '</td>' +
+        '<td>' + (t.completed_at ? '<span class="yes">Completed</span>' : '<span class="no">Waiting</span>') + (t.locked ? ' <span class="lock">(locked)</span>' : '') + '</td>' +
+        '<td class="res">' + (t.completed_at ? (esc(t.hidden_result) || '<span class="no">blank</span>') : '') + '</td>' +
+        '<td>' + (t.draw_seed || '') + '</td>' +
+        '<td>' + when(t.completed_at) + '</td>' +
+        '<td><button class="ghost" data-a="set_result" data-t="' + t.team_no + '">Set result</button>' +
+        (t.locked ? '<button class="ghost" data-a="unlock" data-t="' + t.team_no + '">Unlock</button>' : '') +
+        (t.completed_at ? '<button class="ghost danger" data-a="reset_team" data-t="' + t.team_no + '">Reset</button>' : '') + '</td></tr>';
+    }).join('');
+    var free = 0;
+    var pool = (data.pool || []).map(function (p) { free += Number(p.free); return esc(p.result) + ': ' + p.free + ' unused of ' + p.total; });
+    $('stats').innerHTML = '<div><b>' + done + ' / 24</b>completed</div><div><b>' + coded + ' / 24</b>IC digits set</div><div><b>' + free + '</b>unused pool slots</div>';
+    $('poolNow').textContent = pool.length ? 'Current pool → ' + pool.join('  ·  ') : 'Current pool is empty. Moves will still be locked in; results stay blank until you add a pool and press the fill button.';
+  }
+
+  $('login').addEventListener('submit', function (e) {
+    e.preventDefault(); pw = $('pw').value;
+    call('list').then(function (r) { if (r) { $('login').style.display = 'none'; $('app').style.display = 'block'; } });
+  });
+  $('refresh').addEventListener('click', function () { call('list'); });
+  $('saveCodes').addEventListener('click', function () { call('set_codes', { text: $('codes').value }).then(function (r) { if (r) $('codes').value = ''; }); });
+  $('savePool').addEventListener('click', function () { call('set_pool', { text: $('pool').value }).then(function (r) { if (r) $('pool').value = ''; }); });
+  $('fill').addEventListener('click', function () { call('fill_blanks'); });
+  $('rows').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var a = b.dataset.a, t = Number(b.dataset.t);
+    if (a === 'reset_team') { if (confirm('Reset MAD ' + pad(t) + '? This erases their move and lets them do it again.')) call(a, { team: t }); }
+    else if (a === 'set_result') { var v = prompt('Hidden result for MAD ' + pad(t) + ' (leave empty to clear):'); if (v !== null) call(a, { team: t, result: v }); }
+    else call(a, { team: t });
+  });
+  $('csv').addEventListener('click', function () {
+    var lines = ['Team,Status,Hidden result,Seed,Completed at'];
+    (data.teams || []).forEach(function (t) {
+      lines.push(['MAD ' + pad(t.team_no), t.completed_at ? 'Completed' : 'Waiting', '"' + String(t.hidden_result || '').replace(/"/g, '""') + '"', t.draw_seed || '', t.completed_at || ''].join(','));
+    });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+    a.download = 'mad-first-move.csv'; a.click();
+  });
+})();
+</script>
+</body>
+</html>
