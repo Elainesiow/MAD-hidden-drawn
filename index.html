@@ -57,7 +57,8 @@ body[data-mood="night"] .art{opacity:0}
 /* ---------- screens ---------- */
 .screen{position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;opacity:0;visibility:hidden;transition:opacity .55s ease,visibility 0s .55s}
 .screen.active{opacity:1;visibility:visible;transition:opacity .55s ease .15s,visibility 0s}
-.body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:max(26px,env(safe-area-inset-top)) 24px 16px}
+.body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:calc(54px + env(safe-area-inset-top)) 24px 16px}
+#open .body{padding-top:max(26px,env(safe-area-inset-top))}
 .inner{width:100%;max-width:430px;margin:0 auto}
 .bar{flex:none;min-height:var(--bar);padding:14px 24px calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:16px;background:#0d0d0d;transition:background-color 1.3s}
 .bar > .inner{display:flex;align-items:center;gap:16px}
@@ -71,6 +72,15 @@ body[data-mood="night"] .bar{background:rgba(3,6,18,.92);box-shadow:0 -1px 0 rgb
 .btn[disabled]{background:#2b3355;color:#8089a8;cursor:default}
 .blk{display:inline-block;font-family:var(--display);font-weight:400;text-transform:uppercase;color:#fff;background:var(--pink);line-height:1;padding:.36em .7em .3em;
   transform:rotate(-2.5deg);clip-path:polygon(1.5% 10%,99% 0,100% 88%,97.5% 100%,2% 95%,0 42%)}
+
+/* ---------- sound on/off ---------- */
+.snd{position:fixed;z-index:5;top:calc(10px + env(safe-area-inset-top));right:14px;width:40px;height:40px;border-radius:50%;display:none;place-items:center;
+  background:rgba(13,13,13,.82);color:#fff;border:1px solid rgba(255,255,255,.35)}
+.snd.show{display:grid}
+.snd svg{width:20px;height:20px}
+.snd .off{display:none}
+.snd[aria-pressed="false"] .on{display:none}
+.snd[aria-pressed="false"] .off{display:block}
 
 /* ---------- 1. opening ---------- */
 .eyebrow{font-family:var(--display);font-size:17px;letter-spacing:.22em;display:flex;align-items:center;gap:12px}
@@ -266,6 +276,13 @@ body[data-mood="night"] .bar{background:rgba(3,6,18,.92);box-shadow:0 -1px 0 rgb
   <div class="bar"><p class="blk">Every move counts.</p></div>
 </section>
 
+<button class="snd" id="snd" type="button" aria-pressed="true" aria-label="Sound on or off">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>
+    <path class="on" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
+    <path class="off" d="M17 9l5 6M22 9l-5 6"/>
+  </svg>
+</button>
 <div class="flash" id="flash" aria-hidden="true"></div>
 
 <script>
@@ -324,7 +341,48 @@ body[data-mood="night"] .bar{background:rgba(3,6,18,.92);box-shadow:0 -1px 0 rgb
     clearTimeout(pauseTimer);
     if (s.pause) pauseTimer = setTimeout(function () { slide(i + 1); }, s.pause);
   }
-  $('enter').addEventListener('click', function () { show('story'); slide(0); });
+  /* ---------- SOUND: background song + click sound ----------
+     Song file: assets/music.mp3 (replace the file to change the song).
+     Phones only allow sound after the first tap, so it starts on ENTER. */
+  var MUSIC_VOLUME = 0.45, CLICK_VOLUME = 0.22;
+  var soundOn = true, music = null, actx = null;
+  function startSound() {
+    try { var AC = window.AudioContext || window.webkitAudioContext; if (AC && !actx) actx = new AC(); if (actx && actx.state === 'suspended') actx.resume(); } catch (x) {}
+    if (!music) {
+      music = new Audio('assets/music.mp3');
+      music.loop = true; music.preload = 'auto'; music.volume = MUSIC_VOLUME;
+    }
+    if (soundOn) { var pr = music.play(); if (pr && pr.catch) pr.catch(function () {}); }
+    $('snd').classList.add('show');
+  }
+  function tick() {
+    if (!soundOn || !actx) return;
+    try {
+      if (actx.state === 'suspended') actx.resume();
+      var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(520, t + 0.06);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(CLICK_VOLUME, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.1);
+    } catch (x) {}
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button');
+    if (b && b.id !== 'hold' && b.id !== 'enter') tick();
+  }, true);
+  $('hold').addEventListener('pointerdown', tick);
+  $('snd').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    if (music) { if (soundOn) { var pr = music.play(); if (pr && pr.catch) pr.catch(function () {}); } else music.pause(); }
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (!music) return;
+    if (document.hidden) music.pause();
+    else if (soundOn) { var pr = music.play(); if (pr && pr.catch) pr.catch(function () {}); }
+  });
+
+  $('enter').addEventListener('click', function () { startSound(); tick(); show('story'); slide(0); });
   $('next').addEventListener('click', function () { if (idx < STORY.length - 1) slide(idx + 1); });
   $('toTeam').addEventListener('click', function () { show('team', 'night'); });
 
