@@ -1,9 +1,28 @@
 // Shared server-side helpers. Files starting with "_" are NOT public endpoints.
 const crypto = require('crypto');
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+// Reads a setting, forgiving stray spaces/quotes and a few common alternative names.
+function env() {
+  for (let i = 0; i < arguments.length; i++) {
+    const v = String(process.env[arguments[i]] || '').trim().replace(/^["']|["']$/g, '').trim();
+    if (v) return v;
+  }
+  return '';
+}
+const SUPABASE_URL = env('SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL').replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
+const SERVICE_KEY = env('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_KEY', 'SUPABASE_SECRET_KEY');
+const ADMIN_PASSWORD = env('ADMIN_PASSWORD');
+
+// Names only (never values) of what is still missing, so setup problems are easy to spot.
+function missing() {
+  const m = [];
+  if (!SUPABASE_URL) m.push('SUPABASE_URL is missing');
+  else if (!/^https?:\/\/.+/.test(SUPABASE_URL)) m.push('SUPABASE_URL must start with https://');
+  if (!SERVICE_KEY) m.push('SUPABASE_SERVICE_ROLE_KEY is missing');
+  if (!ADMIN_PASSWORD) m.push('ADMIN_PASSWORD is missing');
+  else if (ADMIN_PASSWORD.length < 8) m.push('ADMIN_PASSWORD is shorter than 8 characters');
+  return m;
+}
 
 function configured() {
   return Boolean(SUPABASE_URL && SERVICE_KEY);
@@ -79,5 +98,5 @@ function body(req) {
 }
 
 module.exports = {
-  ADMIN_PASSWORD, configured, safeEqual, codeHash, makeToken, readToken, clientIp, rpc, send, body,
+  ADMIN_PASSWORD, missing, configured, safeEqual, codeHash, makeToken, readToken, clientIp, rpc, send, body,
 };

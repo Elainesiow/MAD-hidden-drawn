@@ -1,10 +1,11 @@
 // POST /api/admin  { password, action, ... }   — organiser only.
-const { ADMIN_PASSWORD, configured, safeEqual, codeHash, clientIp, rpc, send, body } = require('./_lib');
+const { ADMIN_PASSWORD, missing, safeEqual, codeHash, clientIp, rpc, send, body } = require('./_lib');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, { ok: false, error: 'Method not allowed' }, 405);
-  if (!configured() || ADMIN_PASSWORD.length < 8) {
-    return send(res, { ok: false, error: 'Server is not set up yet (check the 3 environment variables; admin password needs 8+ characters).' }, 500);
+  const gaps = missing();
+  if (gaps.length) {
+    return send(res, { ok: false, error: 'Setup problem in Vercel (Production environment): ' + gaps.join('; ') + '. Fix it, then Redeploy.' }, 500);
   }
   try {
     const b = body(req);
@@ -85,6 +86,7 @@ module.exports = async (req, res) => {
     return send(res, { ok: true, message, data });
   } catch (e) {
     console.error(e);
-    return send(res, { ok: false, error: 'Server error. Check that the SQL script was run in Supabase.' }, 500);
+    const why = /401|403|Invalid API key|JWT/i.test(String(e.message)) ? 'Supabase rejected the key: SUPABASE_SERVICE_ROLE_KEY is wrong (it must be the service_role / secret key from the SAME project as SUPABASE_URL).' : /404|PGRST202|Could not find/i.test(String(e.message)) ? 'Supabase is connected but the tables are missing: run supabase.sql in the SQL Editor of this project.' : /fetch failed|ENOTFOUND/i.test(String(e.message)) ? 'Cannot reach Supabase: SUPABASE_URL is wrong.' : 'Server error. Check that the SQL script was run in Supabase.';
+    return send(res, { ok: false, error: why }, 500);
   }
 };
