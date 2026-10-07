@@ -51,7 +51,7 @@ td.res{color:#FFD60A;font-weight:700}
 
     <h2>Teams</h2>
     <div class="scroll"><table>
-      <thead><tr><th>Team</th><th>IC set</th><th>Status</th><th>Hidden result</th><th>Seed</th><th>Completed (your local time)</th><th></th></tr></thead>
+      <thead><tr><th>Team</th><th>Name</th><th>IC set</th><th>Status</th><th>Hidden result</th><th>Seed</th><th>Completed (your local time)</th><th></th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
 
@@ -73,6 +73,7 @@ td.res{color:#FFD60A;font-weight:700}
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var pw = '', data = null;
+  var NAMES = ["KFC POTATO", "Anything", "ERROR 404", "Born 2 Win", "M.E.K.D.I !", "WINNER", "MAD ARMY", "PHOENIX", "Diu Diu", "LEGENDS", "Legion5", "MickClub", "5 BEANZ", "Might", "Winoledi", "bohead2", "BOMBIBII", "100plus", "L26B", "BEASTX", "MADSPARK", "DiuLeiAh", "WARRIOR", "HOSEHLAR"];
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function note(text, err) { var n = $('note'); n.textContent = text || ''; n.className = err ? 'err' : ''; n.style.display = text ? 'block' : 'none'; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -94,7 +95,7 @@ td.res{color:#FFD60A;font-weight:700}
     var teams = data.teams || [], done = 0, coded = 0;
     $('rows').innerHTML = teams.map(function (t) {
       if (t.completed_at) done++; if (t.has_code) coded++;
-      return '<tr><td><b>MAD ' + pad(t.team_no) + '</b></td>' +
+      return '<tr><td><b>MAD ' + pad(t.team_no) + '</b></td><td>' + esc(NAMES[t.team_no - 1]) + '</td>' +
         '<td class="' + (t.has_code ? 'yes">Yes' : 'no">Not yet') + '</td>' +
         '<td>' + (t.completed_at ? '<span class="yes">Completed</span>' : '<span class="no">Waiting</span>') + (t.locked ? ' <span class="lock">(locked)</span>' : '') + '</td>' +
         '<td class="res">' + (t.completed_at ? (esc(t.hidden_result) || '<span class="no">blank</span>') : '') + '</td>' +
@@ -126,9 +127,9 @@ td.res{color:#FFD60A;font-weight:700}
     else call(a, { team: t });
   });
   $('csv').addEventListener('click', function () {
-    var lines = ['Team,Status,Hidden result,Seed,Completed at'];
+    var lines = ['Team,Name,Status,Hidden result,Seed,Completed at'];
     (data.teams || []).forEach(function (t) {
-      lines.push(['MAD ' + pad(t.team_no), t.completed_at ? 'Completed' : 'Waiting', '"' + String(t.hidden_result || '').replace(/"/g, '""') + '"', t.draw_seed || '', t.completed_at || ''].join(','));
+      lines.push(['MAD ' + pad(t.team_no), '"' + NAMES[t.team_no - 1] + '"', t.completed_at ? 'Completed' : 'Waiting', '"' + String(t.hidden_result || '').replace(/"/g, '""') + '"', t.draw_seed || '', t.completed_at || ''].join(','));
     });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));

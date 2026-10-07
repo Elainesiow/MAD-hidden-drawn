@@ -105,9 +105,11 @@ body[data-mood="night"] .bar{background:rgba(3,6,18,.92);box-shadow:0 -1px 0 rgb
   text-shadow:0 0 18px rgba(53,214,255,.55);transform:skewX(-6deg);transform-origin:left bottom}
 @supports (-webkit-text-stroke:1px #000){.neon{color:transparent;-webkit-text-stroke:1.6px var(--cyan)}}
 .sub{font-size:18px;color:#fff;margin-top:8px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:20px}
-.team{font-family:var(--display);font-size:27px;line-height:1;padding:8px 0 10px;color:#fff;background:rgba(14,26,62,.78);border:1px solid rgba(53,214,255,.38);border-radius:10px;transition:background-color .15s,border-color .15s,box-shadow .15s}
-.team small{display:block;font-family:var(--body);font-weight:700;font-size:10px;letter-spacing:.18em;color:var(--cyan);margin-bottom:3px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:20px}
+.team{font-family:var(--display);font-size:21px;line-height:1.05;letter-spacing:.02em;text-align:left;padding:9px 12px 10px;min-width:0;color:#fff;background:rgba(14,26,62,.78);border:1px solid rgba(53,214,255,.38);border-radius:10px;transition:background-color .15s,border-color .15s,box-shadow .15s}
+.team small{display:block;font-family:var(--body);font-weight:700;font-size:11px;letter-spacing:.16em;color:var(--cyan);margin-bottom:4px}
+.team span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tname{font-family:var(--display);font-size:30px;line-height:1.1;color:#fff;margin:14px 0 0 2px;letter-spacing:.02em}
 .team[aria-checked="true"]{background:var(--pink);border-color:#ff7cc4;box-shadow:0 0 18px rgba(240,20,140,.75)}
 .team[aria-checked="true"] small{color:#fff}
 
@@ -161,7 +163,7 @@ body[data-mood="night"] .bar{background:rgba(3,6,18,.92);box-shadow:0 -1px 0 rgb
 
 @media (max-height:660px){
   .slide{padding-top:8px}.slide.mid{padding-top:14vh}.slide .en{font-size:min(10vw,40px)}.slide.small .en{font-size:min(7.6vw,30px)}.slide .zh{font-size:17px;margin-top:12px}
-  .neon{font-size:min(11vw,44px)}.team{font-size:22px;padding:5px 0 7px}.grid{gap:6px;margin-top:12px}
+  .neon{font-size:min(11vw,44px)}.team{font-size:18px;padding:6px 10px 7px}.grid{gap:6px;margin-top:12px}
   .badge{font-size:44px;margin-top:12px}.panel{margin-top:14px;padding:14px}.code{font-size:42px}.msg{min-height:60px}
   .lines{font-size:16px}.stage{padding-top:12px}
 }
@@ -217,6 +219,7 @@ body[data-mood="night"] .bar{background:rgba(3,6,18,.92);box-shadow:0 -1px 0 rgb
     <h2 class="neon">Verify your team</h2>
     <p class="sub zh">验证你的队伍</p>
     <p class="blk badge" id="badge">MAD 01</p>
+    <p class="tname" id="tname"></p>
     <div class="panel">
       <label for="code">
         <span class="ask">Enter your Team Leader's<br>last 4 digits of IC</span>
@@ -326,13 +329,16 @@ body[data-mood="night"] .bar{background:rgba(3,6,18,.92);box-shadow:0 -1px 0 rgb
   $('toTeam').addEventListener('click', function () { show('team', 'night'); });
 
   /* ---------- team ---------- */
+  /* ---------- TEAM NAMES (MAD 01 to MAD 24, in order) ---------- */
+  var NAMES = ["KFC POTATO", "Anything", "ERROR 404", "Born 2 Win", "M.E.K.D.I !", "WINNER", "MAD ARMY", "PHOENIX", "Diu Diu", "LEGENDS", "Legion5", "MickClub", "5 BEANZ", "Might", "Winoledi", "bohead2", "BOMBIBII", "100plus", "L26B", "BEASTX", "MADSPARK", "DiuLeiAh", "WARRIOR", "HOSEHLAR"];
   var team = null, grid = $('grid');
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   for (var n = 1; n <= 24; n++) {
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'team'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', 'false');
-    b.dataset.team = n; b.setAttribute('aria-label', 'MAD ' + pad(n));
-    b.innerHTML = '<small>MAD</small>' + pad(n);
+    b.dataset.team = n; b.setAttribute('aria-label', 'MAD ' + pad(n) + ', ' + NAMES[n - 1]);
+    b.innerHTML = '<small>MAD ' + pad(n) + '</small><span></span>';
+    b.lastChild.textContent = NAMES[n - 1];
     grid.appendChild(b);
   }
   grid.addEventListener('click', function (e) {
@@ -344,6 +350,7 @@ body[data-mood="night"] .bar{background:rgba(3,6,18,.92);box-shadow:0 -1px 0 rgb
   $('confirm').addEventListener('click', function () {
     if (!team) return;
     $('badge').textContent = 'MAD ' + pad(team);
+    $('tname').textContent = NAMES[team - 1];
     $('code').value = ''; $('vbtn').disabled = true; say('vmsg', '', '');
     show('verify');
   });
